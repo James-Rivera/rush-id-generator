@@ -1,0 +1,84 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String    // In production, this should be hashed
+  email         String?   @unique
+  name          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  images        Image[]
+  history       History[]
+  logs          Log[]
+  
+  @@map("users")
+}
+
+model Image {
+  id            String    @id @default(cuid())
+  userId        String
+  originalUrl   String    // URL to original uploaded image
+  processedUrl String?   // URL to processed image (2x2 or passport)
+  thumbnailUrl  String?   // URL to thumbnail
+  size          String    @default("2x2") // "2x2" or "passport"
+  status        String    @default("pending") // "pending", "processing", "completed", "failed"
+  metadata      Json?     // Store additional metadata (dimensions, file size, etc.)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history       History[]
+  
+  @@map("images")
+  @@index([userId])
+  @@index([status])
+}
+
+model History {
+  id            String    @id @default(cuid())
+  userId        String
+  imageId       String
+  action        String    // "upload", "process", "download", "delete"
+  details       Json?     // Additional action details
+  createdAt     DateTime  @default(now())
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image         Image     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  
+  @@map("history")
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Log {
+  id            String    @id @default(cuid())
+  userId        String?
+  action        String    // "login", "logout", "api_call", "error", etc.
+  endpoint      String?   // API endpoint if applicable
+  method        String?   // HTTP method
+  statusCode    Int?      // HTTP status code
+  message       String?
+  metadata      Json?     // Additional log data
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("logs")
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+}
