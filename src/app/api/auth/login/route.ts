@@ -15,7 +15,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if user exists in database
+    const envUsername = process.env.AUTH_USERNAME?.trim();
+    const envPassword = process.env.AUTH_PASSWORD;
+
+    // No-DB mode: if env credentials are configured, authenticate against them.
+    if (envUsername && envPassword) {
+      const isValid = username === envUsername && password === envPassword;
+
+      if (!isValid) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid username or password' },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json(
+        { success: true, message: 'Login successful', user: { id: `env:${envUsername}`, username: envUsername } },
+        { status: 200 }
+      );
+    }
+
+    // DB mode fallback: Check if user exists in database
     const user = await prisma.user.findUnique({
       where: { username },
     });

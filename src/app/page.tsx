@@ -696,30 +696,21 @@ export default function Home() {
 
               {/* Dropdown */}
               {showUserDropdown && (
-                <div className="absolute bg-[#faf6b6] rounded-[16px] top-full mt-2 right-0 w-[140px] shadow-lg z-50 overflow-hidden">
-                  <div className="flex gap-3 items-center px-5 py-2 border-b border-[rgba(0,0,0,0.1)]">
-                    <div className="relative size-6">
-                      <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 24 24">
-                        <path d={svgPathsUser.pfc0e500} fill="black" />
-                      </svg>
-                    </div>
-                    <p className="font-['Satoshi:Medium',sans-serif] text-[12px] text-black">Staff User</p>
-                  </div>
-                  
+                <div className="absolute bg-[#faf6b6] rounded-[16px] top-full mt-2 right-0 w-full min-w-[160px] shadow-lg z-50 overflow-hidden">
                   <button 
                     onClick={() => {
                       setShowUserDropdown(false);
                       setShowSettings(true);
                     }}
-                    className="bg-[#faf6b6] flex items-center h-8 px-5 py-2 w-full hover:bg-[#f5f19a] transition-colors border-b border-[rgba(0,0,0,0.1)]"
+                    className="bg-[#faf6b6] flex items-center h-9 px-4 py-2 w-full hover:bg-[#f5f19a] transition-colors border-b border-[rgba(0,0,0,0.1)]"
                   >
-                    <div className="flex gap-4 items-center">
+                    <div className="flex gap-3 items-center">
                       <div className="relative size-[14px]">
                         <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 14 14">
                           <path d="M7 0.583496C3.22017 0.583496 0.583328 3.22034 0.583328 7.00016C0.583328 10.78 3.22017 13.4168 7 13.4168C10.7798 13.4168 13.4167 10.78 13.4167 7.00016C13.4167 3.22034 10.7798 0.583496 7 0.583496ZM7 2.91683C8.12867 2.91683 9.04167 3.82984 9.04167 4.9585C9.04167 6.08717 8.12867 7.00016 7 7.00016C5.87133 7.00016 4.95833 6.08717 4.95833 4.9585C4.95833 3.82984 5.87133 2.91683 7 2.91683ZM7 11.6668C5.54167 11.6668 4.249 10.9562 3.5 9.85433C3.52067 8.72017 5.83333 8.10516 7 8.10516C8.16083 8.10516 10.4793 8.72017 10.5 9.85433C9.751 10.9562 8.45833 11.6668 7 11.6668Z" fill="black" fillOpacity="0.3" />
                         </svg>
                       </div>
-                      <p className="font-['Satoshi:Regular',sans-serif] text-[10px] text-[rgba(0,0,0,0.3)]">Settings</p>
+                      <p className="font-['Satoshi:Medium',sans-serif] text-[10px] md:text-[12px] text-[rgba(0,0,0,0.55)]">Settings</p>
                     </div>
                   </button>
 
@@ -728,28 +719,30 @@ export default function Home() {
                       setShowUserDropdown(false);
                       setShowHistory(true);
                     }}
-                    className="bg-[#faf6b6] flex items-center h-8 px-5 py-2 w-full hover:bg-[#f5f19a] transition-colors border-b border-[rgba(0,0,0,0.1)]"
+                    className="bg-[#faf6b6] flex items-center h-9 px-4 py-2 w-full hover:bg-[#f5f19a] transition-colors border-b border-[rgba(0,0,0,0.1)]"
                   >
-                    <div className="flex gap-4 items-center">
+                    <div className="flex gap-3 items-center">
                       <div className="relative size-[14px]">
                         <svg className="block size-full" fill="none" viewBox="0 0 14 14">
                           <path d="M7 1.16699C3.78 1.16699 1.16667 3.78033 1.16667 7.00033C1.16667 10.2203 3.78 12.8337 7 12.8337C10.22 12.8337 12.8333 10.2203 12.8333 7.00033C12.8333 3.78033 10.22 1.16699 7 1.16699ZM7 11.667C4.42667 11.667 2.33333 9.57366 2.33333 7.00033C2.33333 4.42699 4.42667 2.33366 7 2.33366C9.57333 2.33366 11.6667 4.42699 11.6667 7.00033C11.6667 9.57366 9.57333 11.667 7 11.667ZM7.29167 4.08366H6.70833V7.29199L9.45 8.97533L9.625 8.54449L7.29167 7.11699V4.08366Z" fill="black" fillOpacity="0.3" />
                         </svg>
                       </div>
-                      <p className="font-['Satoshi:Regular',sans-serif] text-[10px] text-[rgba(0,0,0,0.3)]">History</p>
+                      <p className="font-['Satoshi:Medium',sans-serif] text-[10px] md:text-[12px] text-[rgba(0,0,0,0.55)]">History</p>
                     </div>
                   </button>
 
                   <button 
                     onClick={() => setIsLoggedIn(false)}
-                    className="flex gap-4 items-center px-5 py-2 w-full hover:bg-[#f5f19a] transition-colors"
+                    className="flex items-center h-9 px-4 py-2 w-full hover:bg-[#f5f19a] transition-colors"
                   >
-                    <div className="relative size-[14px]">
-                      <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 14 14">
-                        <path d="M4.66667 10.2085L3.5 9.04183L5.54167 7.00016L3.5 4.9585L4.66667 3.79183L7.875 7.00016L4.66667 10.2085ZM7.58333 12.2502V10.7918H12.25V3.20849H7.58333V1.75016H12.25C12.6417 1.75016 12.9739 1.88725 13.2469 2.16141C13.5208 2.43475 13.6577 2.76683 13.6577 3.15766V10.8418C13.6577 11.2335 13.5208 11.5656 13.2469 11.8381C12.9739 12.1115 12.6417 12.2481 12.25 12.2481L7.58333 12.2502ZM0.875 7.72933V6.27099H9.04167V7.72933H0.875Z" fill="black" fillOpacity="0.3" />
-                      </svg>
+                    <div className="flex gap-3 items-center">
+                      <div className="relative size-[14px]">
+                        <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 14 14">
+                          <path d="M4.66667 10.2085L3.5 9.04183L5.54167 7.00016L3.5 4.9585L4.66667 3.79183L7.875 7.00016L4.66667 10.2085ZM7.58333 12.2502V10.7918H12.25V3.20849H7.58333V1.75016H12.25C12.6417 1.75016 12.9739 1.88725 13.2469 2.16141C13.5208 2.43475 13.6577 2.76683 13.6577 3.15766V10.8418C13.6577 11.2335 13.5208 11.5656 13.2469 11.8381C12.9739 12.1115 12.6417 12.2481 12.25 12.2481L7.58333 12.2502ZM0.875 7.72933V6.27099H9.04167V7.72933H0.875Z" fill="black" fillOpacity="0.3" />
+                        </svg>
+                      </div>
+                      <p className="font-['Satoshi:Medium',sans-serif] text-[10px] md:text-[12px] text-[rgba(0,0,0,0.55)]">Logout</p>
                     </div>
-                    <p className="font-['Satoshi:Regular',sans-serif] text-[10px] text-[rgba(0,0,0,0.3)]">Logout</p>
                   </button>
                 </div>
               )}
