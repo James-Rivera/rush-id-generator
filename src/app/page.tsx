@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import svgPaths from "../components/imports/svg-f0m95wope4";
 import svgPathsUser from "../components/imports/svg-k20bu2cd5y";
+
 import { HistoryPage } from "../components/HistoryPage";
 import { BatchProcessor } from "../components/BatchProcessor";
+const ImageCropper = dynamic(() => import('../components/ImageCropper'), { ssr: false });
 
 type IDSize = '2x2' | 'passport';
 type PhotoStyle = 'white-bg' | 'formal' | 'custom';
@@ -422,6 +425,11 @@ export default function Home() {
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Cropper state
+  const [showCropper, setShowCropper] = useState(false);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [cropOutputSize, setCropOutputSize] = useState<{width:number, height:number}|null>(null);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -455,12 +463,79 @@ export default function Home() {
       setUploadedImage(reader.result as string);
       setGeneratedImage(null);
       setAppState('upload');
+      setShowCropper(true);
+      // Always require cropping before showing preview
     };
     reader.onerror = () => {
       setShowUploadError(true);
     };
     reader.readAsDataURL(file);
   };
+  // Handle crop complete from ImageCropper
+  // Accepts both crop area and output size
+  const handleCropComplete = (croppedPixels: any, outputSize?: {width:number, height:number}) => {
+    setCroppedAreaPixels(croppedPixels);
+    if (outputSize) setCropOutputSize(outputSize);
+  };
+
+  // Apply crop and hide cropper
+  // Utility to convert dataURL to Blob
+  function dataURLtoBlob(dataurl: string) {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)![1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  }
+
+  const handleApplyCrop = async () => {
+    if (!uploadedImage || !croppedAreaPixels) {
+      setShowCropper(false);
+      return;
+    }
+    // Use output size from cropper (based on selectedSize)
+    const width = cropOutputSize?.width || 600;
+    const height = cropOutputSize?.height || 600;
+    const croppedDataUrl = await getCroppedImg(uploadedImage, croppedAreaPixels, width, height);
+    setUploadedImage(croppedDataUrl); // Show cropped image as preview
+    setUploadedFile(dataURLtoBlob(croppedDataUrl)); // Send cropped image to backend
+    setShowCropper(false);
+    // Note: The cropped image is now the user's chosen framing. When generating, only remove background (rembg) in backend.
+  };
+
+  // Utility: crop image in browser (react-image-crop compatible)
+  async function getCroppedImg(imageSrc: string, crop: any, outputWidth = 600, outputHeight = 600): Promise<string> {
+    const image = new window.Image();
+    image.src = imageSrc;
+    await new Promise((resolve) => { image.onload = resolve; });
+    // crop.x, crop.y, crop.width, crop.height are in pixels relative to the image's natural size
+    // No scaling needed, just use crop directly
+    const sx = Math.round(crop.x || 0);
+    const sy = Math.round(crop.y || 0);
+    const sw = Math.round(crop.width || image.naturalWidth);
+    const sh = Math.round(crop.height || image.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No 2d context');
+    ctx.drawImage(
+      image,
+      sx,
+      sy,
+      sw,
+      sh,
+      0,
+      0,
+      outputWidth,
+      outputHeight
+    );
+    return canvas.toDataURL('image/png');
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -566,22 +641,7 @@ export default function Home() {
       setGeneratedImage(data.image);
       setAppState('completed');
 
-      // Save to history
-      const newHistoryItem: HistoryItem = {
-        id: Date.now().toString(),
-        originalImage: uploadedImage,
-        generatedImage: data.image,
-        size: selectedSize,
-        style: selectedStyle,
-        bgColor: selectedBgColor,
-        customPrompt: selectedStyle === 'custom' ? customPrompt : undefined,
-        timestamp: Date.now(),
-      };
-
-      const existingHistory = localStorage.getItem('idPhotoHistory');
-      const history: HistoryItem[] = existingHistory ? JSON.parse(existingHistory) : [];
-      history.unshift(newHistoryItem);
-      localStorage.setItem('idPhotoHistory', JSON.stringify(history));
+      // Removed saving to localStorage to prevent quota errors
     } catch (err: any) {
       setErrorToast(err.message || 'Get 404 Error, Please try again');
       setTimeout(() => setErrorToast(null), 3000);
@@ -780,43 +840,85 @@ export default function Home() {
           {/* Left Column - Upload/Preview Area */}
           <div className="w-full">
             {appState === 'upload' && (
-              <div
-                className="bg-white h-[400px] md:h-[500px] lg:h-[542px] rounded-[24px] w-full cursor-pointer border-2 border-[#efe418] border-dashed transition-all hover:border-[#e5d817]"
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onClick={!uploadedImage ? handleSelectPhotoClick : undefined}
-              >
-                <div className="flex flex-col items-center size-full">
-                  {uploadedImage ? (
-                    <div className="flex items-center justify-center p-5 md:p-8 size-full">
-                      <Image
-                        src={uploadedImage}
-                        alt="Uploaded"
-                        width={500}
-                        height={500}
-                        className="max-h-full max-w-full object-contain rounded-lg"
+              <>
+                {/* Always require cropping before showing preview */}
+                {showCropper && uploadedImage ? (
+                  <div className="bg-white rounded-[24px] w-full flex flex-col items-center justify-center p-4 md:p-8" style={{ minHeight: 400 }}>
+                    <h3 className="font-['Satoshi:Bold',sans-serif] text-[16px] text-black mb-2">Crop your photo</h3>
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                      <ImageCropper
+                        imageSrc={uploadedImage}
+                        onCropComplete={handleCropComplete}
+                        selectedSize={selectedSize}
+                        onResetOriginal={() => {
+                          // Restore original image and re-open cropper
+                          setUploadedImage(null);
+                          setUploadedFile(null);
+                          setShowCropper(false);
+                          setTimeout(() => setShowCropper(true), 50);
+                        }}
                       />
                     </div>
-                  ) : (
-                    <div className="flex flex-col gap-4 md:gap-6 items-center px-8 md:px-16 py-12 md:py-24 size-full justify-center">
-                      <div className="bg-white flex items-center p-4 relative rounded-[28px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)] size-[48px] md:size-[56px] transition-transform hover:scale-110">
-                        <div className="relative size-6">
-                          <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 24 24">
-                            <path d={svgPaths.p37c6ce80} stroke="black" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="font-['Satoshi:Bold',sans-serif] text-black text-center">
-                        <p className="text-[18px] md:text-[24px] mb-2">Drag and drop your photo here</p>
-                        <p className="font-['Satoshi:Regular',sans-serif] text-[13px] md:text-[15px]">or click to browse from your computer</p>
-                      </div>
-                      <div className="bg-[#f2f8ab] flex h-12 md:h-14 items-center justify-center px-8 md:px-10 rounded-[16px] hover:bg-[#eef59f] hover:scale-105 transition-all">
-                        <p className="font-['Satoshi:Medium',sans-serif] text-[14px] md:text-[15px] text-black">Select Photo</p>
-                      </div>
+                    <div className="flex gap-4 mt-4">
+                      <button
+                        className="bg-[#e50000] text-white px-6 py-2 rounded-[16px] font-['Satoshi:Bold',sans-serif] hover:bg-[#cc0000]"
+                        onClick={handleApplyCrop}
+                      >
+                        Apply Crop
+                      </button>
+                      <button
+                        className="bg-gray-200 text-black px-6 py-2 rounded-[16px] font-['Satoshi:Bold',sans-serif] hover:bg-gray-300"
+                        onClick={() => {
+                          setShowCropper(false);
+                          setUploadedImage(null);
+                          setUploadedFile(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
                     </div>
-                  )}
-                </div>
-              </div>
+                  </div>
+                ) : (
+                  <div
+                    className="bg-white h-[400px] md:h-[500px] lg:h-[542px] rounded-[24px] w-full cursor-pointer border-2 border-[#efe418] border-dashed transition-all hover:border-[#e5d817]"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={!uploadedImage ? handleSelectPhotoClick : undefined}
+                  >
+                    <div className="flex flex-col items-center size-full">
+                      {!uploadedImage ? (
+                        <div className="flex flex-col gap-4 md:gap-6 items-center px-8 md:px-16 py-12 md:py-24 size-full justify-center">
+                          <div className="bg-white flex items-center p-4 relative rounded-[28px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.25)] size-[48px] md:size-[56px] transition-transform hover:scale-110">
+                            <div className="relative size-6">
+                              <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 24 24">
+                                <path d={svgPaths.p37c6ce80} stroke="black" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="font-['Satoshi:Bold',sans-serif] text-black text-center">
+                            <p className="text-[18px] md:text-[24px] mb-2">Drag and drop your photo here</p>
+                            <p className="font-['Satoshi:Regular',sans-serif] text-[13px] md:text-[15px]">or click to browse from your computer</p>
+                          </div>
+                          <div className="bg-[#f2f8ab] flex h-12 md:h-14 items-center justify-center px-8 md:px-10 rounded-[16px] hover:bg-[#eef59f] hover:scale-105 transition-all">
+                            <p className="font-['Satoshi:Medium',sans-serif] text-[14px] md:text-[15px] text-black">Select Photo</p>
+                          </div>
+                        </div>
+                      ) : (
+                        // Show cropped image preview after cropping
+                        <div className="flex items-center justify-center p-5 md:p-8 size-full">
+                          <Image
+                            src={uploadedImage}
+                            alt="Cropped Preview"
+                            width={500}
+                            height={500}
+                            className="max-h-full max-w-full object-contain rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Completed State - Before/After */}

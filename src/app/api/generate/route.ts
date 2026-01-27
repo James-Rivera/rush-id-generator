@@ -195,142 +195,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Image processing failed after AI' }, { status: 500 });
     }
   } else {
-    // White background: REQUIRED pipeline = rembg → MediaPipe crop script
-    // This is essential for proper 2x2 ID photo generation with correct framing.
+    // White background: rembg only, preserve user's manual crop
     const rembgResult = await removeBackgroundWithRembg(imageBuffer);
-    
     if (!rembgResult || !rembgResult.buffer) {
-      // rembg is REQUIRED - fail fast with clear error
       const errorDetails = rembgResult?.error || 'Unknown error';
-      const hasOnnxError = errorDetails.toLowerCase().includes('onnxruntime') || errorDetails.toLowerCase().includes('no onnxruntime');
-      
-      if (hasOnnxError) {
-        return NextResponse.json({ 
-          error: 'rembg requires onnxruntime backend, but it is not available for your Python version.',
-          details: 'Python 3.14 is too new - onnxruntime (required by rembg) only supports Python 3.8-3.12. You need to use Python 3.12 or earlier.',
-          solution: [
-            '1. Install Python 3.12 from https://www.python.org/downloads/',
-            '2. Install rembg with CPU support: py -3.12 -m pip install "rembg[cpu]"',
-            '3. Update your code to use Python 3.12, or set PYTHON environment variable: $env:PYTHON = "C:\\Path\\To\\Python312\\python.exe"'
-          ],
-          currentPython: 'Python 3.14.2 (onnxruntime not available)',
-          requiredPython: 'Python 3.8-3.12',
-          rawError: errorDetails.substring(0, 500)
-        }, { status: 500 });
-      }
-      
-      return NextResponse.json({ 
-        error: 'Background removal failed. rembg could not process the image.',
-        details: 'The ID photo generator requires rembg for background removal. Check the server console (terminal where you ran npm run dev) for detailed error messages.',
-        troubleshooting: [
-          '1. Check server console logs - they show which Python command failed and why',
-          '2. Verify Python works: Open PowerShell and run: py -3 --version',
-          '3. Verify rembg is installed: py -3 -m pip show rembg',
-          '4. Test rembg manually: py -3 -m rembg i test-input.jpg test-output.png',
-          '5. If Python is not found, add Python to your system PATH or set PYTHON environment variable',
-          '6. If you see "onnxruntime" errors, you may need Python 3.12 or earlier'
-        ],
-        rawError: errorDetails.substring(0, 500)
-      }, { status: 500 });
+      return NextResponse.json({ error: 'Background removal failed. rembg could not process the image.', details: errorDetails }, { status: 500 });
     }
-    
-    const removed = rembgResult.buffer;
-
-    // rembg succeeded - now REQUIRED to call MediaPipe crop script for proper 2x2 ID framing
-    try {
-      const debug = process.env.DEBUG_REMBG === '1';
-      const innerThreshold = parsedInnerThreshold ?? 200;
-      const featherPx = parsedFeatherPx ?? 2;
-
-      // Prepare the rembg output for the crop script
-      const alphaPng = await sharp(removed).ensureAlpha().extractChannel(3).png().toBuffer();
-      const maskInner = await sharp(alphaPng).threshold(innerThreshold).png().toBuffer();
-      const maskFeather = await sharp(maskInner).blur(featherPx).png().toBuffer();
-      const rgbPng = await sharp(removed).removeAlpha().png().toBuffer();
-      const recomposed = await sharp(rgbPng).joinChannel(maskFeather).png().toBuffer();
-      
-      const tmpIn = path.join(os.tmpdir(), `rembg_for_crop_in_${Date.now()}.png`);
-      const tmpOut = path.join(os.tmpdir(), `rembg_for_crop_out_${Date.now()}.jpg`);
-      
-      // Flatten over white for the crop script (MediaPipe needs opaque input)
-      const flattenedForCrop = await sharp(recomposed).flatten({ background: { r: 255, g: 255, b: 255 } }).png().toBuffer();
-      await fs.promises.writeFile(tmpIn, flattenedForCrop);
-      if (debug) console.log('WROTE REMBG FOR CROP:', tmpIn);
-
-      // REQUIRED: Call MediaPipe crop script - this is essential for proper 2x2 ID framing
-      let cropRan = false;
-      let cropJson: any = null;
-      let cropOutPath: string | null = null;
-      let lastError: string = '';
-
-      // Try 'py -3' first (Windows)
-      try {
-        const pyCmd = 'py';
-        const args = ['-3', path.join(process.cwd(), 'scripts', 'crop_rush_id.py'), tmpIn, tmpOut, '--size', '600'];
-        if (wantTransparent) args.push('--preserve-alpha');
-        const res = execFileSync(pyCmd, args, { stdio: 'pipe', timeout: 30000 });
-        const resStr = String(res);
-        if (debug) console.log('crop CLI (py -3) stdout:', resStr);
-        const jsonMatch = resStr.match(/\{[\s\S]*?\}/);
-        if (jsonMatch) {
-          cropJson = JSON.parse(jsonMatch[0]);
-          cropOutPath = cropJson.outPath;
-          if (cropOutPath) {
-            processedBuffer = await fs.promises.readFile(cropOutPath);
-            cropRan = true;
-          }
-        }
-      } catch (e: any) {
-        lastError = e?.stderr ? String(e.stderr) : (e?.message || String(e));
-        if (debug) console.error('crop CLI (py -3) failed:', lastError);
-        
-        // Try 'python' as fallback
-        try {
-          const py2 = process.env.PYTHON || 'python';
-          const args2 = [path.join(process.cwd(), 'scripts', 'crop_rush_id.py'), tmpIn, tmpOut, '--size', '600'];
-          if (wantTransparent) args2.push('--preserve-alpha');
-          const res2 = execFileSync(py2, args2, { stdio: 'pipe', timeout: 30000 });
-          const resStr2 = String(res2);
-          if (debug) console.log('crop CLI (python) stdout:', resStr2);
-          const jsonMatch2 = resStr2.match(/\{[\s\S]*?\}/);
-          if (jsonMatch2) {
-            cropJson = JSON.parse(jsonMatch2[0]);
-            cropOutPath = cropJson.outPath;
-            if (cropOutPath) {
-              processedBuffer = await fs.promises.readFile(cropOutPath);
-              cropRan = true;
-            }
-          }
-        } catch (e2: any) {
-          lastError = e2?.stderr ? String(e2.stderr) : (e2?.message || String(e2));
-          if (debug) console.error('crop CLI (python) also failed:', lastError);
-        }
-      }
-
-      // Cleanup temp files
-      try { await fs.promises.unlink(tmpIn).catch(()=>{}); } catch {}
-      try { await fs.promises.unlink(tmpOut).catch(()=>{}); } catch {}
-      if (cropOutPath) { try { await fs.promises.unlink(cropOutPath).catch(()=>{}); } catch {} }
-
-      if (!cropRan) {
-        // MediaPipe crop script is REQUIRED - fail with clear error
-        return NextResponse.json({ 
-          error: 'MediaPipe crop script failed. Required for proper 2x2 ID photo framing.',
-          details: `The crop_rush_id.py script (which uses MediaPipe for face detection) failed to run. Error: ${lastError || 'Unknown error'}. Please ensure Python dependencies are installed: py -3 -m pip install opencv-python mediapipe numpy`,
-          installCommand: 'py -3 -m pip install opencv-python mediapipe numpy'
-        }, { status: 500 });
-      }
-
-      if (debug) console.log('MediaPipe crop script succeeded, using cropped output');
-      // cropJson is now available for SHA256 in raw response
-      
-    } catch (err: any) {
-      console.error('Pipeline error after rembg:', err);
-      return NextResponse.json({ 
-        error: 'Image processing pipeline failed',
-        details: err?.message || String(err)
-      }, { status: 500 });
-    }
+    // Flatten to white and resize to 600x600 (2x2) or passport size if needed
+    processedBuffer = await sharp(rembgResult.buffer)
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
+      .jpeg({ quality: 95 })
+      .toBuffer();
   }
 
   // If caller asked for raw image (useful for direct download), return image/jpeg bytes
