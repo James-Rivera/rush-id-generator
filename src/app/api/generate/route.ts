@@ -108,35 +108,34 @@ async function removeBackgroundWithRembg(inputBuffer: Buffer): Promise<{ buffer:
       if (st && st.size > 0) {
         outBuf = await fs.promises.readFile(outPath);
       } else {
-        const allErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
+        const rembgAllErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
         console.error('rembg did not produce output file or file empty', { 
           inPath, 
           outPath, 
           attempts: attempts.map(a => ({ cmd: a.cmd, ok: a.ok, stderr: a.stderr.substring(0, 200) })),
-          allErrors
+          allErrors: rembgAllErrors
         });
         // Return error details for better user feedback
-        const allErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
-        return { buffer: null as any, error: allErrors };
+        return { buffer: null as any, error: rembgAllErrors };
       }
     } catch (e) {
-      const allErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
+      const rembgAllErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
       console.error('Error reading rembg output file', e, { 
         inPath, 
         outPath, 
         lastAttempt: lastAttempt.cmd,
         stderr: lastAttempt.stderr,
-        allErrors
+        allErrors: rembgAllErrors
       });
-      return { buffer: null as any, error: allErrors };
+      return { buffer: null as any, error: rembgAllErrors };
     }
 
     // cleanup inPath/outPath
     await fs.promises.unlink(inPath).catch(() => {});
     await fs.promises.unlink(outPath).catch(() => {});
     if (!outBuf) {
-      const allErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
-      return { buffer: null as any, error: allErrors };
+      const rembgAllErrors = attempts.filter(a => !a.ok).map(a => a.stderr).join(' ');
+      return { buffer: null as any, error: rembgAllErrors };
     }
     return { buffer: outBuf };
   } catch (err) {
@@ -276,8 +275,10 @@ export async function POST(request: Request) {
         if (jsonMatch) {
           cropJson = JSON.parse(jsonMatch[0]);
           cropOutPath = cropJson.outPath;
-          processedBuffer = await fs.promises.readFile(cropOutPath);
-          cropRan = true;
+          if (cropOutPath) {
+            processedBuffer = await fs.promises.readFile(cropOutPath);
+            cropRan = true;
+          }
         }
       } catch (e: any) {
         lastError = e?.stderr ? String(e.stderr) : (e?.message || String(e));
@@ -295,8 +296,10 @@ export async function POST(request: Request) {
           if (jsonMatch2) {
             cropJson = JSON.parse(jsonMatch2[0]);
             cropOutPath = cropJson.outPath;
-            processedBuffer = await fs.promises.readFile(cropOutPath);
-            cropRan = true;
+            if (cropOutPath) {
+              processedBuffer = await fs.promises.readFile(cropOutPath);
+              cropRan = true;
+            }
           }
         } catch (e2: any) {
           lastError = e2?.stderr ? String(e2.stderr) : (e2?.message || String(e2));
