@@ -1,5 +1,4 @@
-'use client';
-
+"use client";
 import { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
@@ -404,10 +403,23 @@ function SettingsPage({ onBack }: { onBack: () => void }) {
 }
 
 export default function Home() {
+    // Undo crop: restore original uploaded image and file
+    const handleUndoCrop = () => {
+      if (originalImage && originalFile) {
+        setUploadedImage(originalImage);
+        setUploadedFile(originalFile);
+        setGeneratedImage(null);
+        setAppState('upload');
+        setShowCropper(false);
+      }
+    };
   // State management
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // Store original image/file for undo crop
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<IDSize>('2x2');
   const [selectedStyle, setSelectedStyle] = useState<PhotoStyle>('white-bg');
@@ -458,9 +470,11 @@ export default function Home() {
     }
 
     setUploadedFile(file);
+    setOriginalFile(file); // Save original file for undo
     const reader = new FileReader();
     reader.onloadend = () => {
       setUploadedImage(reader.result as string);
+      setOriginalImage(reader.result as string); // Save original image for undo
       setGeneratedImage(null);
       setAppState('upload');
       setShowCropper(true);
@@ -502,7 +516,20 @@ export default function Home() {
     const height = cropOutputSize?.height || 600;
     const croppedDataUrl = await getCroppedImg(uploadedImage, croppedAreaPixels, width, height);
     setUploadedImage(croppedDataUrl); // Show cropped image as preview
-    setUploadedFile(dataURLtoBlob(croppedDataUrl)); // Send cropped image to backend
+    // Convert croppedDataUrl to File for setUploadedFile
+    const blob = dataURLtoBlob(croppedDataUrl);
+    const file = new File([blob], 'cropped.png', { type: 'image/png' });
+    setUploadedFile(file); // Send cropped image to backend
+      // Undo crop: restore original uploaded image and file
+      const handleUndoCrop = () => {
+        if (originalImage && originalFile) {
+          setUploadedImage(originalImage);
+          setUploadedFile(originalFile);
+          setGeneratedImage(null);
+          setAppState('upload');
+          setShowCropper(false);
+        }
+      };
     setShowCropper(false);
     // Note: The cropped image is now the user's chosen framing. When generating, only remove background (rembg) in backend.
   };
@@ -957,6 +984,15 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+                {/* Undo crop button */}
+                <div className="flex w-full justify-center mt-4">
+                  <button
+                    className="bg-gray-200 text-black px-6 py-2 rounded-[16px] font-['Satoshi:Bold',sans-serif] hover:bg-gray-300"
+                    onClick={handleUndoCrop}
+                  >
+                    Undo Crop
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1198,6 +1234,7 @@ export default function Home() {
                       <div className="w-full h-full bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500" />
                     </button>
 
+
                     {/* Custom */}
                     <button
                       onClick={() => setSelectedBgColor('custom')}
@@ -1209,8 +1246,8 @@ export default function Home() {
                         <path d="M17.5 11.667C15.8333 11.667 14.4792 12.4378 13.4375 13.9795C12.3958 15.5211 11.875 17.5003 11.875 19.917H13.125C13.125 17.8753 13.5625 16.2086 14.4375 14.917C15.3125 13.6253 16.3542 12.9795 17.5625 12.917V16.667L21.25 12.917L17.5 9.167V11.667ZM17.5 23.3337C19.1667 23.3337 20.5208 22.5628 21.5625 21.0212C22.6042 19.4795 23.125 17.5003 23.125 15.0837H21.875C21.875 17.1253 21.4375 18.792 20.5625 20.0837C19.6875 21.3753 18.6458 22.0211 17.4375 22.0837V18.3337L13.75 22.0837L17.5 25.8337V23.3337Z" fill="#2F2F2F" />
                       </svg>
                     </button>
-            </div>
-          </div>
+                  </div>
+                </div>
 
                 {/* Links */}
                 <div className="flex flex-col gap-3 w-full">
@@ -1244,17 +1281,17 @@ export default function Home() {
                     </div>
                   </button>
 
-          <button
+                  <button
                     onClick={handleStartOver}
                     className="bg-white h-11 md:h-12 relative rounded-[24px] w-full hover:bg-gray-50 transition-colors border border-[#595959]"
-          >
+                  >
                     <div className="flex items-center justify-center size-full">
                       <p className="font-['Satoshi:Bold',sans-serif] text-[14px] md:text-[16px] text-black">Start over</p>
                     </div>
-          </button>
+                  </button>
                 </div>
-          </div>
-        )}
+              </div>
+            )}
           </div>
         </div>
       </div>

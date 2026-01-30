@@ -4,8 +4,15 @@ import ReactCrop, { centerCrop, makeAspectCrop, Crop, PixelCrop } from 'react-im
 import 'react-image-crop/dist/ReactCrop.css';
 
 
-// selectedSize: '2x2' | 'passport'
-export default function ImageCropper({ imageSrc, onCropComplete, selectedSize, onResetOriginal }) {
+type IDSize = '2x2' | 'passport';
+interface ImageCropperProps {
+  imageSrc: string;
+  onCropComplete: (crop: { x: number; y: number; width: number; height: number }, outputSize: { width: number; height: number }) => void;
+  selectedSize: IDSize;
+  onResetOriginal?: () => void;
+}
+
+export default function ImageCropper({ imageSrc, onCropComplete, selectedSize, onResetOriginal }: ImageCropperProps) {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [crop, setCrop] = useState<Crop | undefined>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
@@ -99,13 +106,6 @@ export default function ImageCropper({ imageSrc, onCropComplete, selectedSize, o
           onLoad={onImageLoad}
         />
       </ReactCrop>
-      <button
-        type="button"
-        style={{ marginTop: 16, background: '#eee', border: 'none', borderRadius: 8, padding: '6px 18px', fontWeight: 600, cursor: 'pointer' }}
-        onClick={handleResetCrop}
-      >
-        Reset to Original
-      </button>
     </div>
   );
 }

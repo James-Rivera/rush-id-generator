@@ -1,5 +1,13 @@
+
 @import './tailwind.css';
 @import '../components/styles/globals.css';
+
+html, body {
+  font-family: 'Satoshi-Variable', 'Satoshi', 'Satoshi-Regular', 'Satoshi-Medium', 'Satoshi-Bold', Arial, sans-serif;
+  font-weight: 400;
+  color: #222;
+  background: #fafafa;
+}
 
 /* Satoshi Font Faces */
 @font-face {
